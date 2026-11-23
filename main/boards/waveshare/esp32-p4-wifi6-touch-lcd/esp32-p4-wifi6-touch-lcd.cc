@@ -464,13 +464,17 @@ private:
         lvgl_port_add_touch(&touch_cfg);
 
         // --- НАЧАЛО ДОБАВЛЕННОГО КОДА ---
-        // Получаем текущий активный экран LVGL
         lv_obj_t * screen = lv_scr_act();
         
-        // Добавляем обработчик события нажатия на весь экран
         lv_obj_add_event_cb(screen, [](lv_event_t * e) {
             auto& app = Application::GetInstance();
-            // Если приложение в режиме ожидания (или готово), запускаем чат
+            
+            // 1. Будим таймер сна при любом касании (чтобы экран загорелся)
+            if (app.GetBoard().GetPowerSaveTimer()) {
+                app.GetBoard().GetPowerSaveTimer()->WakeUp();
+            }
+            
+            // 2. Если приложение в режиме ожидания — запускаем чат
             if (app.GetDeviceState() == kDeviceStateIdle || app.GetDeviceState() == kDeviceStateStarting) {
                  app.ToggleChatState();
             }
@@ -519,9 +523,9 @@ public:
         GetBacklight()->RestoreBrightness();
 
         // --- НАЧАЛО ДОБАВЛЕННОГО КОДА ---
-        // Настраиваем таймер энергосбережения
-        // 10 минут = 600 секунд
-        power_save_timer_ = new PowerSaveTimer(600, 60); 
+        // Настраиваем таймер энергосбережения: 600 секунд до сна и 600 до выключения
+        // Это должно дать 10 минут до того, как экран погаснет
+        power_save_timer_ = new PowerSaveTimer(600, 600); 
         power_save_timer_->OnEnterSleepMode([this]() {
             ESP_LOGI(TAG, "Entering sleep mode, turning off screen");
             GetBacklight()->SetBrightness(0); // Полностью гасим подсветку
