@@ -4,6 +4,7 @@
 #include "display/lcd_display.h"
 // #include "display/no_display.h"
 #include "button.h"
+#include "power_save_timer.h"
 
 #include "esp_video.h"
 #include "esp_video_init.h"
@@ -93,7 +94,7 @@ private:
     Button boot_button_;
     LcdDisplay *display_;
     EspVideo* camera_ = nullptr;
-
+    PowerSaveTimer* power_save_timer_ = nullptr;
 
     esp_err_t i2c_device_probe(uint8_t addr) {
         return i2c_master_probe(i2c_bus_, addr, 100);
@@ -461,6 +462,21 @@ private:
             .handle = tp,
         };
         lvgl_port_add_touch(&touch_cfg);
+
+        // --- НАЧАЛО ДОБАВЛЕННОГО КОДА ---
+        // Получаем текущий активный экран LVGL
+        lv_obj_t * screen = lv_scr_act();
+        
+        // Добавляем обработчик события нажатия на весь экран
+        lv_obj_add_event_cb(screen, [](lv_event_t * e) {
+            auto& app = Application::GetInstance();
+            // Если приложение в режиме ожидания (или готово), запускаем чат
+            if (app.GetDeviceState() == kDeviceStateIdle || app.GetDeviceState() == kDeviceStateStarting) {
+                 app.ToggleChatState();
+            }
+        }, LV_EVENT_CLICKED, NULL);
+        // --- КОНЕЦ ДОБАВЛЕННОГО КОДА ---
+
         ESP_LOGI(TAG, "Touch panel initialized successfully");
     }
     void InitializeCamera() {
@@ -501,6 +517,21 @@ public:
         InitializeCamera();
         InitializeButtons();
         GetBacklight()->RestoreBrightness();
+
+        // --- НАЧАЛО ДОБАВЛЕННОГО КОДА ---
+        // Настраиваем таймер энергосбережения
+        // 10 минут = 600 секунд
+        power_save_timer_ = new PowerSaveTimer(600, 60); 
+        power_save_timer_->OnEnterSleepMode([this]() {
+            ESP_LOGI(TAG, "Entering sleep mode, turning off screen");
+            GetBacklight()->SetBrightness(0); // Полностью гасим подсветку
+        });
+        power_save_timer_->OnExitSleepMode([this]() {
+            ESP_LOGI(TAG, "Exiting sleep mode, turning on screen");
+            GetBacklight()->RestoreBrightness(); // Восстанавливаем яркость
+        });
+        power_save_timer_->SetEnabled(true);
+        // --- КОНЕЦ ДОБАВЛЕННОГО КОДА ---
     }
 
     virtual AudioCodec* GetAudioCodec() override {
