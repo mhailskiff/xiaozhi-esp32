@@ -469,9 +469,10 @@ private:
         lv_obj_add_event_cb(screen, [](lv_event_t * e) {
             auto& app = Application::GetInstance();
             
-            // 1. Будим таймер сна при любом касании (чтобы экран загорелся)
-            if (app.GetBoard().GetPowerSaveTimer()) {
-                app.GetBoard().GetPowerSaveTimer()->WakeUp();
+           // Будим таймер сна при любом касании
+            // (если экран погас, это вернет подсветку)
+            if (power_save_timer_) {
+                power_save_timer_->WakeUp();
             }
             
             // 2. Если приложение в режиме ожидания — запускаем чат
