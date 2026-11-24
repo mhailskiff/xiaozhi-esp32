@@ -2,7 +2,6 @@
 #include "codecs/box_audio_codec.h"
 #include "application.h"
 #include "display/lcd_display.h"
-// #include "display/no_display.h"
 #include "button.h"
 #include "power_save_timer.h"
 
@@ -18,7 +17,7 @@
 #include "esp_lcd_st7703.h"
 #elif CONFIG_BOARD_TYPE_WAVESHARE_ESP32_P4_WIFI6_TOUCH_LCD_4_3
 #include "esp_lcd_st7701.h"
-#elif CONFIG_BOARD_TYPE_WAVESHARE_ESP32_P4_WIFI6_TOUCH_LCD_
+#elif CONFIG_BOARD_TYPE_WAVESHARE_ESP32_P4_WIFI6_TOUCH_LCD_5
 #include "esp_lcd_hx8394.h"
 #elif CONFIG_BOARD_TYPE_WAVESHARE_ESP32_P4_WIFI6_TOUCH_LCD_7B
 #include "esp_lcd_ek79007.h"
@@ -94,7 +93,7 @@ private:
     EspVideo* camera_ = nullptr;
     PowerSaveTimer* power_save_timer_ = nullptr;
 
-    // Статический метод-обработчик тача (единственный способ передать this в C-функцию LVGL)
+    // Статическая функция для обработки тача (без лямбд!)
     static void on_touch_event(lv_event_t* e);
 
     esp_err_t i2c_device_probe(uint8_t addr) {
@@ -149,81 +148,7 @@ private:
         };
         esp_lcd_new_panel_io_dbi(mipi_dsi_bus, &dbi_config, &io);
 
-#if CONFIG_BOARD_TYPE_WAVESHARE_ESP32_P4_WIFI6_TOUCH_LCD_4B
-        esp_lcd_dpi_panel_config_t dpi_config = {
-            .dpi_clk_src = MIPI_DSI_DPI_CLK_SRC_DEFAULT,
-            .dpi_clock_freq_mhz = 46,
-            .in_color_format = LCD_COLOR_FMT_RGB565,
-            .out_color_format = LCD_COLOR_FMT_RGB565,
-            .num_fbs = 1,
-            .video_timing = {
-                .h_size = 720, .v_size = 720,
-                .hsync_pulse_width = 20, .hsync_back_porch = 80, .hsync_front_porch = 80,
-                .vsync_pulse_width = 4, .vsync_back_porch = 12, .vsync_front_porch = 30,
-            },
-        };
-        st7703_vendor_config_t vendor_config = {
-            .mipi_config = { .dsi_bus = mipi_dsi_bus, .dpi_config = &dpi_config },
-            .flags = { .use_mipi_interface = 1 },
-        };
-        const esp_lcd_panel_dev_config_t lcd_dev_config = {
-            .rgb_ele_order = LCD_RGB_ELEMENT_ORDER_RGB,
-            .bits_per_pixel = 16,
-            .reset_gpio_num = PIN_NUM_LCD_RST,
-            .vendor_config = &vendor_config,
-        };
-        esp_lcd_new_panel_st7703(io, &lcd_dev_config, &disp_panel);
-#elif CONFIG_BOARD_TYPE_WAVESHARE_ESP32_P4_WIFI6_TOUCH_LCD_4_3
-        esp_lcd_dpi_panel_config_t dpi_config = {
-            .dpi_clk_src = MIPI_DSI_DPI_CLK_SRC_DEFAULT,
-            .dpi_clock_freq_mhz = 30,
-            .in_color_format = LCD_COLOR_FMT_RGB565,
-            .out_color_format = LCD_COLOR_FMT_RGB565,
-            .num_fbs = 1,
-            .video_timing = {
-                .h_size = 480, .v_size = 800,
-                .hsync_pulse_width = 12, .hsync_back_porch = 42, .hsync_front_porch = 42,
-                .vsync_pulse_width = 8, .vsync_back_porch = 2, .vsync_front_porch = 60,
-            },
-        };
-        st7701_vendor_config_t vendor_config = {
-            .init_cmds = vendor_specific_init_default,
-            .init_cmds_size = sizeof(vendor_specific_init_default) / sizeof(st7701_lcd_init_cmd_t),
-            .mipi_config = { .dsi_bus = mipi_dsi_bus, .dpi_config = &dpi_config },
-            .flags = { .use_mipi_interface = 1 },
-        };
-        const esp_lcd_panel_dev_config_t lcd_dev_config = {
-            .rgb_ele_order = LCD_RGB_ELEMENT_ORDER_RGB,
-            .bits_per_pixel = 16,
-            .reset_gpio_num = PIN_NUM_LCD_RST,
-            .vendor_config = &vendor_config,
-        };
-        esp_lcd_new_panel_st7701(io, &lcd_dev_config, &disp_panel);
-#elif CONFIG_BOARD_TYPE_WAVESHARE_ESP32_P4_WIFI6_TOUCH_LCD_5
-        esp_lcd_dpi_panel_config_t dpi_config = {
-            .dpi_clk_src = MIPI_DSI_DPI_CLK_SRC_DEFAULT,
-            .dpi_clock_freq_mhz = 58,
-            .in_color_format = LCD_COLOR_FMT_RGB565,
-            .out_color_format = LCD_COLOR_FMT_RGB565,
-            .num_fbs = 1,
-            .video_timing = {
-                .h_size = DISPLAY_WIDTH, .v_size = DISPLAY_HEIGHT,
-                .hsync_pulse_width = 20, .hsync_back_porch = 20, .hsync_front_porch = 40,
-                .vsync_pulse_width = 4, .vsync_back_porch = 10, .vsync_front_porch = 24,
-            },
-        };
-        hx8394_vendor_config_t vendor_config = {
-            .mipi_config = { .dsi_bus = mipi_dsi_bus, .dpi_config = &dpi_config, .lane_num = 2 },
-        };
-        const esp_lcd_panel_dev_config_t lcd_dev_config = {
-            .rgb_ele_order = LCD_RGB_ELEMENT_ORDER_RGB,
-            .bits_per_pixel = 16,
-            .reset_gpio_num = PIN_NUM_LCD_RST,
-            .vendor_config = &vendor_config,
-            .flags = { .reset_active_high = true },
-        };
-        esp_lcd_new_panel_hx8394(io, &lcd_dev_config, &disp_panel);
-#elif CONFIG_BOARD_TYPE_WAVESHARE_ESP32_P4_WIFI6_TOUCH_LCD_7B
+#if CONFIG_BOARD_TYPE_WAVESHARE_ESP32_P4_WIFI6_TOUCH_LCD_7B
         esp_lcd_dpi_panel_config_t dpi_config = {
             .dpi_clk_src = MIPI_DSI_DPI_CLK_SRC_DEFAULT,
             .dpi_clock_freq_mhz = 52,
@@ -246,81 +171,6 @@ private:
             .vendor_config = &vendor_config,
         };
         esp_lcd_new_panel_ek79007(io, &lcd_dev_config, &disp_panel);
-#elif CONFIG_BOARD_TYPE_WAVESHARE_ESP32_P4_WIFI6_TOUCH_LCD_3_4C || CONFIG_BOARD_TYPE_WAVESHARE_ESP32_P4_WIFI6_TOUCH_LCD_4C
-        esp_lcd_dpi_panel_config_t dpi_config = {
-            .dpi_clk_src = MIPI_DSI_DPI_CLK_SRC_DEFAULT,
-            .dpi_clock_freq_mhz = 46,
-            .in_color_format = LCD_COLOR_FMT_RGB565,
-            .out_color_format = LCD_COLOR_FMT_RGB565,
-            .num_fbs = 1,
-            .video_timing = {
-                .h_size = DISPLAY_WIDTH, .v_size = DISPLAY_HEIGHT,
-                .hsync_pulse_width = 20, .hsync_back_porch = 20, .hsync_front_porch = 40,
-                .vsync_pulse_width = 4, .vsync_back_porch = 12, .vsync_front_porch = 24,
-            },
-        };
-        jd9365_vendor_config_t vendor_config = {
-            .init_cmds = lcd_init_cmds,
-            .init_cmds_size = sizeof(lcd_init_cmds) / sizeof(lcd_init_cmds[0]),
-            .mipi_config = { .dsi_bus = mipi_dsi_bus, .dpi_config = &dpi_config, .lane_num = 2 },
-        };
-        const esp_lcd_panel_dev_config_t lcd_dev_config = {
-            .rgb_ele_order = LCD_RGB_ELEMENT_ORDER_RGB,
-            .bits_per_pixel = 16,
-            .reset_gpio_num = PIN_NUM_LCD_RST,
-            .vendor_config = &vendor_config,
-        };
-        esp_lcd_new_panel_jd9365(io, &lcd_dev_config, &disp_panel);
-#elif CONFIG_BOARD_TYPE_WAVESHARE_ESP32_P4_WIFI6_TOUCH_LCD_8 || CONFIG_BOARD_TYPE_WAVESHARE_ESP32_P4_WIFI6_TOUCH_LCD_10_1
-        esp_lcd_dpi_panel_config_t dpi_config = {
-            .dpi_clk_src = MIPI_DSI_DPI_CLK_SRC_DEFAULT,
-            .dpi_clock_freq_mhz = 52,
-            .in_color_format = LCD_COLOR_FMT_RGB565,
-            .out_color_format = LCD_COLOR_FMT_RGB565,
-            .num_fbs = 1,
-            .video_timing = {
-                .h_size = DISPLAY_WIDTH, .v_size = DISPLAY_HEIGHT,
-                .hsync_pulse_width = 20, .hsync_back_porch = 20, .hsync_front_porch = 40,
-                .vsync_pulse_width = 4, .vsync_back_porch = 10, .vsync_front_porch = 30,
-            },
-        };
-        jd9365_vendor_config_t vendor_config = {
-            .init_cmds = lcd_init_cmds,
-            .init_cmds_size = sizeof(lcd_init_cmds) / sizeof(lcd_init_cmds[0]),
-            .mipi_config = { .dsi_bus = mipi_dsi_bus, .dpi_config = &dpi_config, .lane_num = 2 },
-        };
-        const esp_lcd_panel_dev_config_t lcd_dev_config = {
-            .rgb_ele_order = LCD_RGB_ELEMENT_ORDER_RGB,
-            .bits_per_pixel = 16,
-            .reset_gpio_num = PIN_NUM_LCD_RST,
-            .vendor_config = &vendor_config,
-        };
-        esp_lcd_new_panel_jd9365(io, &lcd_dev_config, &disp_panel);
-#elif CONFIG_BOARD_TYPE_WAVESHARE_ESP32_P4_WIFI6_TOUCH_LCD_7
-        esp_lcd_dpi_panel_config_t dpi_config = {
-            .dpi_clk_src = MIPI_DSI_DPI_CLK_SRC_DEFAULT,
-            .dpi_clock_freq_mhz = 80,
-            .in_color_format = LCD_COLOR_FMT_RGB565,
-            .out_color_format = LCD_COLOR_FMT_RGB565,
-            .num_fbs = 1,
-            .video_timing = {
-                .h_size = DISPLAY_WIDTH, .v_size = DISPLAY_HEIGHT,
-                .hsync_pulse_width = 50, .hsync_back_porch = 239, .hsync_front_porch = 33,
-                .vsync_pulse_width = 30, .vsync_back_porch = 20, .vsync_front_porch = 2,
-            },
-        };
-        ili9881c_vendor_config_t vendor_config = {
-            .init_cmds = lcd_init_cmds,
-            .init_cmds_size = sizeof(lcd_init_cmds) / sizeof(lcd_init_cmds[0]),
-            .mipi_config = { .dsi_bus = mipi_dsi_bus, .dpi_config = &dpi_config, .lane_num = 2 },
-        };
-        const esp_lcd_panel_dev_config_t lcd_dev_config = {
-            .rgb_ele_order = LCD_RGB_ELEMENT_ORDER_RGB,
-            .bits_per_pixel = 16,
-            .reset_gpio_num = PIN_NUM_LCD_RST,
-            .vendor_config = &vendor_config,
-        };
-        esp_lcd_new_panel_ili9881c(io, &lcd_dev_config, &disp_panel);
 #endif
         esp_lcd_panel_reset(disp_panel);
         esp_lcd_panel_init(disp_panel);
@@ -374,11 +224,12 @@ private:
         lvgl_port_add_touch(&touch_cfg);
         ESP_LOGI(TAG, "Touch initialized");
 
-        // ВАЖНО: Используем LV_EVENT_PRESSED для мгновенной реакции (как кнопка), а не CLICKED
+        // Регистрируем обработчик через СТАТИЧЕСКУЮ функцию + this в user_data
         lv_obj_t* screen = lv_scr_act();
         if (screen) {
+            lv_obj_add_event_cb(screen, on_touch_event, LV_EVENT_CLICKED, this);
             lv_obj_add_event_cb(screen, on_touch_event, LV_EVENT_PRESSED, this);
-            ESP_LOGI(TAG, "Touch event handler registered for PRESSED");
+            ESP_LOGI(TAG, "Touch event handler registered");
         }
     }
 
@@ -416,7 +267,7 @@ public:
         power_save_timer_ = new PowerSaveTimer(-1, 600, -1);
         power_save_timer_->OnEnterSleepMode([this]() {
             ESP_LOGI(TAG, "Entering sleep mode");
-            GetBacklight()->SetBrightness(1); // почти 0, но тач-контроллер остаётся живым
+            GetBacklight()->SetBrightness(1);
         });
         power_save_timer_->OnExitSleepMode([this]() {
             ESP_LOGI(TAG, "Exiting sleep mode");
@@ -447,30 +298,23 @@ public:
 
 // Реализация статического обработчика тача (вне класса)
 void WaveshareEsp32p4::on_touch_event(lv_event_t* e) {
-    // Извлекаем указатель на экземпляр класса, который мы передали как user_data
     WaveshareEsp32p4* self = static_cast<WaveshareEsp32p4*>(lv_event_get_user_data(e));
-    if (!self) {
-        ESP_LOGE(TAG, "Touch event: self is null!");
-        return;
-    }
+    if (!self) return;
 
-    ESP_LOGI(TAG, "Touch event detected!");
+    ESP_LOGI(TAG, "Touch event detected");
 
-    // 1. Будим экран (сбрасывает таймер и включает подсветку)
+    // Будим таймер сна (включает подсветку)
     if (self->power_save_timer_) {
         self->power_save_timer_->WakeUp();
     }
 
-    // 2. Запускаем прослушивание (логика полностью скопирована с кнопки BOOT)
+    // Запускаем чат, если в режиме ожидания
     auto& app = Application::GetInstance();
-    if (app.GetDeviceState() == kDeviceStateStarting) {
-        ESP_LOGI(TAG, "Device is starting, entering Wifi config mode");
-        self->EnterWifiConfigMode();
-        return;
+    if (app.GetDeviceState() == kDeviceStateIdle || 
+        app.GetDeviceState() == kDeviceStateStarting) {
+        ESP_LOGI(TAG, "Starting chat from touch");
+        app.ToggleChatState();
     }
-
-    ESP_LOGI(TAG, "Toggling chat state from touch...");
-    app.ToggleChatState();
 }
 
 DECLARE_BOARD(WaveshareEsp32p4);
