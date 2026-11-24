@@ -18,7 +18,7 @@
 #include "esp_lcd_st7703.h"
 #elif CONFIG_BOARD_TYPE_WAVESHARE_ESP32_P4_WIFI6_TOUCH_LCD_4_3
 #include "esp_lcd_st7701.h"
-#elif CONFIG_BOARD_TYPE_WAVESHARE_ESP32_P4_WIFI6_TOUCH_LCD_5
+#elif CONFIG_BOARD_TYPE_WAVESHARE_ESP32_P4_WIFI6_TOUCH_LCD_
 #include "esp_lcd_hx8394.h"
 #elif CONFIG_BOARD_TYPE_WAVESHARE_ESP32_P4_WIFI6_TOUCH_LCD_7B
 #include "esp_lcd_ek79007.h"
@@ -94,7 +94,7 @@ private:
     EspVideo* camera_ = nullptr;
     PowerSaveTimer* power_save_timer_ = nullptr;
 
-    // Статический метод-обработчик тача (нужен, потому что LVGL — это C и не принимает лямбды с захватом)
+    // Статический метод-обработчик тача (единственный способ передать this в C-функцию LVGL)
     static void on_touch_event(lv_event_t* e);
 
     esp_err_t i2c_device_probe(uint8_t addr) {
@@ -374,12 +374,11 @@ private:
         lvgl_port_add_touch(&touch_cfg);
         ESP_LOGI(TAG, "Touch initialized");
 
-        // Регистрируем обработчик касания через СТАТИЧЕСКУЮ функцию + this в user_data
+        // ВАЖНО: Используем LV_EVENT_PRESSED для мгновенной реакции (как кнопка), а не CLICKED
         lv_obj_t* screen = lv_scr_act();
         if (screen) {
-            lv_obj_add_event_cb(screen, on_touch_event, LV_EVENT_CLICKED, this);
             lv_obj_add_event_cb(screen, on_touch_event, LV_EVENT_PRESSED, this);
-            ESP_LOGI(TAG, "Touch event handler registered");
+            ESP_LOGI(TAG, "Touch event handler registered for PRESSED");
         }
     }
 
@@ -417,7 +416,7 @@ public:
         power_save_timer_ = new PowerSaveTimer(-1, 600, -1);
         power_save_timer_->OnEnterSleepMode([this]() {
             ESP_LOGI(TAG, "Entering sleep mode");
-            GetBacklight()->SetBrightness(1); // почти 0, но тач живёт
+            GetBacklight()->SetBrightness(1); // почти 0, но тач-контроллер остаётся живым
         });
         power_save_timer_->OnExitSleepMode([this]() {
             ESP_LOGI(TAG, "Exiting sleep mode");
@@ -448,23 +447,30 @@ public:
 
 // Реализация статического обработчика тача (вне класса)
 void WaveshareEsp32p4::on_touch_event(lv_event_t* e) {
+    // Извлекаем указатель на экземпляр класса, который мы передали как user_data
     WaveshareEsp32p4* self = static_cast<WaveshareEsp32p4*>(lv_event_get_user_data(e));
-    if (!self) return;
+    if (!self) {
+        ESP_LOGE(TAG, "Touch event: self is null!");
+        return;
+    }
 
-    ESP_LOGI(TAG, "Touch event detected");
+    ESP_LOGI(TAG, "Touch event detected!");
 
-    // Будим таймер сна (включает подсветку обратно)
+    // 1. Будим экран (сбрасывает таймер и включает подсветку)
     if (self->power_save_timer_) {
         self->power_save_timer_->WakeUp();
     }
 
-    // Запускаем чат, если устройство в режиме ожидания
+    // 2. Запускаем прослушивание (логика полностью скопирована с кнопки BOOT)
     auto& app = Application::GetInstance();
-    if (app.GetDeviceState() == kDeviceStateIdle ||
-        app.GetDeviceState() == kDeviceStateStarting) {
-        ESP_LOGI(TAG, "Starting chat from touch");
-        app.ToggleChatState();
+    if (app.GetDeviceState() == kDeviceStateStarting) {
+        ESP_LOGI(TAG, "Device is starting, entering Wifi config mode");
+        self->EnterWifiConfigMode();
+        return;
     }
+
+    ESP_LOGI(TAG, "Toggling chat state from touch...");
+    app.ToggleChatState();
 }
 
 DECLARE_BOARD(WaveshareEsp32p4);
