@@ -440,20 +440,26 @@ private:
         };
         lvgl_port_add_touch(&touch_cfg);
 
-        // --- ДОБАВЛЕННЫЙ КОД: ОБРАБОТКА ТАЧА ДЛЯ ПРОБУЖДЕНИЯ И ЗАПУСКА ---
+        // --- ИСПРАВЛЕННЫЙ И БЕЗОПАСНЫЙ КОД ТАЧА ---
         lv_obj_t * screen = lv_scr_act();
         if (screen) {
-            lv_obj_add_event_cb(screen, [this](lv_event_t * e) {
+            // Используем лямбду БЕЗ захвата [], а 'this' передаем последним аргументом (user_data)
+            lv_obj_add_event_cb(screen, [](lv_event_t * e) {
+                // Извлекаем указатель на наш класс из user_data
+                WaveshareEsp32p4* self = static_cast<WaveshareEsp32p4*>(lv_event_get_user_data(e));
+                if (!self) return;
+
                 // 1. Будим таймер сна (включает подсветку обратно)
-                if (power_save_timer_) {
-                    power_save_timer_->WakeUp();
+                if (self->power_save_timer_) {
+                    self->power_save_timer_->WakeUp();
                 }
+                
                 // 2. Запускаем чат, если устройство в режиме ожидания
                 auto& app = Application::GetInstance();
                 if (app.GetDeviceState() == kDeviceStateIdle || app.GetDeviceState() == kDeviceStateStarting) {
                      app.ToggleChatState();
                 }
-            }, LV_EVENT_CLICKED, NULL);
+            }, LV_EVENT_CLICKED, this); // <-- 'this' передается сюда
         }
         // --- КОНЕЦ ДОБАВЛЕННОГО КОДА ---
 
