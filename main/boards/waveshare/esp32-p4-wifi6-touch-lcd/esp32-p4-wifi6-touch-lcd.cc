@@ -221,35 +221,38 @@ private:
         lvgl_port_add_touch(&touch_cfg);
         ESP_LOGI(TAG, "Touch initialized");
 
-        // --- ИСПРАВЛЕННЫЙ БЛОК: добавляем кликабельный слой и обработчик ---
+        // --- НАЧАЛО НОВОГО БЛОКА: создаем прозрачный слой для тача ---
+        // Ждем, пока дисплей инициализируется (этот код вызывается после InitializeLCD)
         lv_obj_t* screen = lv_scr_act();
         if (screen) {
-            // Делаем экран кликабельным, чтобы он принимал события
-            lv_obj_add_flag(screen, LV_OBJ_FLAG_CLICKABLE);
+            // Создаем прозрачный объект поверх всего
+            lv_obj_t* touch_layer = lv_obj_create(screen);
+            lv_obj_remove_style_all(touch_layer); // Убираем стили (фон, рамки)
+            lv_obj_set_size(touch_layer, LV_PCT(100), LV_PCT(100)); // На весь экран
+            lv_obj_align(touch_layer, LV_ALIGN_CENTER, 0, 0);
+            lv_obj_add_flag(touch_layer, LV_OBJ_FLAG_CLICKABLE); // Делаем кликабельным
             
-            // Добавляем обработчик нажатия (используем лямбду с захватом this)
-            lv_obj_add_event_cb(screen, [](lv_event_t* e) {
-                // Получаем указатель на наш класс из user_data
+            // Регистрируем обработчик нажатия (PRESSED срабатывает раньше CLICKED)
+            lv_obj_add_event_cb(touch_layer, [](lv_event_t* e) {
                 auto* self = static_cast<WaveshareEsp32p4*>(lv_event_get_user_data(e));
                 if (!self) return;
 
-                // 1. Будим таймер сна (включает подсветку, если экран погас)
+                // 1. Будим таймер сна
                 if (self->power_save_timer_) {
                     self->power_save_timer_->WakeUp();
                 }
 
-                // 2. Запускаем чат, если в режиме ожидания
+                // 2. Запускаем ассистента, если он в режиме ожидания
                 auto& app = Application::GetInstance();
-                if (app.GetDeviceState() == kDeviceStateIdle || 
-                    app.GetDeviceState() == kDeviceStateStarting) {
-                    ESP_LOGI(TAG, "Starting chat from touch");
+                if (app.GetDeviceState() == kDeviceStateIdle) {
+                    ESP_LOGI(TAG, "Touch: starting chat");
                     app.ToggleChatState();
                 }
-            }, LV_EVENT_CLICKED, this);
+            }, LV_EVENT_PRESSED, this); // Используем PRESSED, а не CLICKED
             
-            ESP_LOGI(TAG, "Touch event handler registered");
+            ESP_LOGI(TAG, "Transparent touch layer created");
         }
-        // --- КОНЕЦ ИСПРАВЛЕННОГО БЛОКА ---
+        // --- КОНЕЦ НОВОГО БЛОКА ---
     }
 
     void InitializeCamera() {
@@ -283,6 +286,7 @@ public:
         GetBacklight()->RestoreBrightness();
 
         // Таймер сна: 600 секунд (10 минут) до гашения экрана
+        // Параметры: cpu_freq (не трогаем = -1), sleep_timeout (600с), shutdown_timeout (-1 = нет)
         power_save_timer_ = new PowerSaveTimer(-1, 600, -1);
         power_save_timer_->OnEnterSleepMode([this]() {
             ESP_LOGI(TAG, "Entering sleep mode");
