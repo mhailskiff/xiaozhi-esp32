@@ -93,9 +93,6 @@ private:
     EspVideo* camera_ = nullptr;
     PowerSaveTimer* power_save_timer_ = nullptr;
 
-    // Статическая функция для обработки тача (без лямбд!)
-    static void on_touch_event(lv_event_t* e);
-
     esp_err_t i2c_device_probe(uint8_t addr) {
         return i2c_master_probe(i2c_bus_, addr, 100);
     }
@@ -224,13 +221,35 @@ private:
         lvgl_port_add_touch(&touch_cfg);
         ESP_LOGI(TAG, "Touch initialized");
 
-        // Регистрируем обработчик через СТАТИЧЕСКУЮ функцию + this в user_data
+        // --- ИСПРАВЛЕННЫЙ БЛОК: добавляем кликабельный слой и обработчик ---
         lv_obj_t* screen = lv_scr_act();
         if (screen) {
-            lv_obj_add_event_cb(screen, on_touch_event, LV_EVENT_CLICKED, this);
-            lv_obj_add_event_cb(screen, on_touch_event, LV_EVENT_PRESSED, this);
+            // Делаем экран кликабельным, чтобы он принимал события
+            lv_obj_add_flag(screen, LV_OBJ_FLAG_CLICKABLE);
+            
+            // Добавляем обработчик нажатия (используем лямбду с захватом this)
+            lv_obj_add_event_cb(screen, [](lv_event_t* e) {
+                // Получаем указатель на наш класс из user_data
+                auto* self = static_cast<WaveshareEsp32p4*>(lv_event_get_user_data(e));
+                if (!self) return;
+
+                // 1. Будим таймер сна (включает подсветку, если экран погас)
+                if (self->power_save_timer_) {
+                    self->power_save_timer_->WakeUp();
+                }
+
+                // 2. Запускаем чат, если в режиме ожидания
+                auto& app = Application::GetInstance();
+                if (app.GetDeviceState() == kDeviceStateIdle || 
+                    app.GetDeviceState() == kDeviceStateStarting) {
+                    ESP_LOGI(TAG, "Starting chat from touch");
+                    app.ToggleChatState();
+                }
+            }, LV_EVENT_CLICKED, this);
+            
             ESP_LOGI(TAG, "Touch event handler registered");
         }
+        // --- КОНЕЦ ИСПРАВЛЕННОГО БЛОКА ---
     }
 
     void InitializeCamera() {
@@ -263,7 +282,7 @@ public:
         InitializeButtons();
         GetBacklight()->RestoreBrightness();
 
-        // Таймер сна: -1 = не трогать частоту CPU, 600с = гасить через 10 мин, -1 = нет полного shutdown
+        // Таймер сна: 600 секунд (10 минут) до гашения экрана
         power_save_timer_ = new PowerSaveTimer(-1, 600, -1);
         power_save_timer_->OnEnterSleepMode([this]() {
             ESP_LOGI(TAG, "Entering sleep mode");
@@ -295,26 +314,5 @@ public:
         return &backlight;
     }
 };
-
-// Реализация статического обработчика тача (вне класса)
-void WaveshareEsp32p4::on_touch_event(lv_event_t* e) {
-    WaveshareEsp32p4* self = static_cast<WaveshareEsp32p4*>(lv_event_get_user_data(e));
-    if (!self) return;
-
-    ESP_LOGI(TAG, "Touch event detected");
-
-    // Будим таймер сна (включает подсветку)
-    if (self->power_save_timer_) {
-        self->power_save_timer_->WakeUp();
-    }
-
-    // Запускаем чат, если в режиме ожидания
-    auto& app = Application::GetInstance();
-    if (app.GetDeviceState() == kDeviceStateIdle || 
-        app.GetDeviceState() == kDeviceStateStarting) {
-        ESP_LOGI(TAG, "Starting chat from touch");
-        app.ToggleChatState();
-    }
-}
 
 DECLARE_BOARD(WaveshareEsp32p4);
